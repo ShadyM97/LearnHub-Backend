@@ -9,13 +9,26 @@ load_dotenv()
 
 app = FastAPI(title="learnhub-backend", version="0.1.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[os.getenv("CORS_ORIGINS", "*")],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Configure CORS
+cors_origins_str = os.getenv("CORS_ORIGINS", "*")
+origins = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
+
+if "*" in origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=".*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(users.router)
 app.include_router(courses.router)
