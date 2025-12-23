@@ -9,7 +9,7 @@ load_dotenv()
 # We initialize it once here to be reused
 supabase: Client = create_client(
     os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
+    os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
 )
 
 # Initialize Supabase Admin client (Service Role)
