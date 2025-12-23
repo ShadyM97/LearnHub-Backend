@@ -1,0 +1,4 @@
+Fetching from: https://nmdyioftzveezlrgtypz.supabase.co/auth/v1/.well-known/jwks.json
+Found 0 keys.
+KIDs: 
+FAILURE: Target KID R1dWxhG0rDzYWclk NOT FOUND in JWKS.

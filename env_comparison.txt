@@ -1,0 +1,4 @@
+
+Backend SUPABASE_URL: https://nmdyioftzveezlrgtypz.supabase.co
+Frontend NEXT_PUBLIC_SUPABASE_URL: https://nmdyioftzveezlrgtypz.supabase.co
+Match: True
