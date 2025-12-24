@@ -85,8 +85,7 @@ async def list_courses(
 @router.get("/my/teacher", response_model=List[schemas.Course])
 async def list_teacher_courses(
     current_user: Dict[str, Any] = Depends(require_role("teacher")),
-    db: Client = Depends(get_supabase),
-    db_admin: Client = Depends(get_supabase_admin)
+    db: Client = Depends(get_supabase)
 ):
     user_id = current_user.get("sub")
     
@@ -100,7 +99,7 @@ async def list_teacher_courses(
         # Optimization: Just use the current user info for teacher
         # Use admin client to bypass RLS
         try:
-            user_res = db_admin.from_("users").select("id, first_name, last_name, avatar_url").eq("id", user_id).single().execute()
+            user_res = db.from_("users").select("id, first_name, last_name, avatar_url").eq("id", user_id).single().execute()
             teacher_info = user_res.data
         except Exception as e:
             print(f"Warning: Could not fetch teacher info: {e}")

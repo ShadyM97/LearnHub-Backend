@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
-from .routers import users, courses, posts
+from .routers import users, courses, posts, spaces
 
 load_dotenv()
 
@@ -33,6 +33,7 @@ else:
 app.include_router(users.router)
 app.include_router(courses.router)
 app.include_router(posts.router)
+app.include_router(spaces.router)
 
 
 @app.get("/health")

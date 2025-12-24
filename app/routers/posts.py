@@ -5,6 +5,8 @@ from .. import schemas
 from ..auth import get_current_user, get_current_user_optional
 from ..dependencies import get_supabase_admin
 from supabase import Client
+import httpx
+import re
 
 router = APIRouter(
     prefix="/posts",
@@ -206,7 +208,8 @@ async def add_comment(
         new_comment = {
             "content": comment.content,
             "post_id": post_id,
-            "user_id": user_id
+            "user_id": user_id,
+            "parent_id": comment.parent_id
         }
         
         res = db.from_("comments").insert(new_comment).execute()
@@ -255,6 +258,91 @@ async def toggle_comment_like(
         print(f"DEBUG Error toggling comment like: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.put("/{post_id}", response_model=schemas.Post)
+async def update_post(
+    post_id: str,
+    post_update: schemas.PostUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Client = Depends(get_supabase_admin)
+):
+    try:
+        user_id = current_user.get("sub")
+        
+        # Check if post exists and belongs to user
+        res = db.from_("posts").select("*").eq("id", post_id).single().execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        if res.data["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to edit this post")
+            
+        update_data = post_update.model_dump(exclude_unset=True)
+        resp = db.from_("posts").update(update_data).eq("id", post_id).execute()
+        
+        if not resp.data:
+            raise HTTPException(status_code=400, detail="Failed to update post")
+            
+        return resp.data[0]
+    except HTTPException: raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{post_id}")
+async def delete_post(
+    post_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Client = Depends(get_supabase_admin)
+):
+    try:
+        user_id = current_user.get("sub")
+        
+        # Check if post exists and belongs to user
+        res = db.from_("posts").select("*").eq("id", post_id).single().execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        if res.data["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this post")
+            
+        db.from_("posts").delete().eq("id", post_id).execute()
+        return {"message": "Post deleted successfully"}
+    except HTTPException: raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/utils/link-preview", response_model=schemas.LinkPreview)
+async def get_link_preview(url: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, follow_redirects=True, timeout=5.0)
+            if response.status_code != 200:
+                return schemas.LinkPreview(url=url)
+            
+            html = response.text
+            
+            title_match = re.search(r'<title>(.*?)</title>', html, re.I | re.S)
+            title = title_match.group(1).strip() if title_match else ""
+            
+            desc_match = re.search(r'<meta.*?name=["\']description["\'].*?content=["\'](.*?)["\']', html, re.I | re.S)
+            if not desc_match:
+                desc_match = re.search(r'<meta.*?property=["\']og:description["\'].*?content=["\'](.*?)["\']', html, re.I | re.S)
+            description = desc_match.group(1).strip() if desc_match else ""
+            
+            img_match = re.search(r'<meta.*?property=["\']og:image["\'].*?content=["\'](.*?)["\']', html, re.I | re.S)
+            if not img_match:
+                img_match = re.search(r'<meta.*?name=["\']twitter:image["\'].*?content=["\'](.*?)["\']', html, re.I | re.S)
+            image = img_match.group(1).strip() if img_match else ""
+            
+            return schemas.LinkPreview(
+                title=title,
+                description=description,
+                image=image,
+                url=url
+            )
+    except Exception as e:
+        print(f"Error fetching link preview: {e}")
+        return schemas.LinkPreview(url=url)
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

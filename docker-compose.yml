@@ -1,7 +1,9 @@
 version: "3.8"
+
 services:
   backend:
     build: .
+    container_name: learnhub-backend
     ports:
       - "8000:8000"
     env_file:

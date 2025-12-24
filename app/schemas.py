@@ -90,9 +90,11 @@ class Enrollment(EnrollmentData):
 class CommentBase(BaseModel):
     content: str
     post_id: str
+    parent_id: Optional[str] = None
 
 class CommentCreate(BaseModel):
     content: str
+    parent_id: Optional[str] = None
 
 class Comment(CommentBase):
     id: str
@@ -113,6 +115,17 @@ class PostBase(BaseModel):
 class PostCreate(PostBase):
     pass
 
+class PostUpdate(BaseModel):
+    content: Optional[str] = None
+    attachments: Optional[List[Any]] = None
+    attachment_count: Optional[int] = None
+
+class LinkPreview(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    image: Optional[str] = None
+    url: str
+
 class Post(PostBase):
     id: str
     user_id: str
@@ -125,3 +138,65 @@ class Post(PostBase):
     class Config:
         from_attributes = True
 
+# Space Schemas
+class SpaceBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+
+class SpaceCreate(SpaceBase):
+    pass
+
+class SpaceUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+
+class Space(SpaceBase):
+    id: str
+    created_at: datetime
+    created_by: str
+    member_count: int = 0
+    is_member: bool = False
+
+    class Config:
+        from_attributes = True
+
+class SpaceThreadBase(BaseModel):
+    title: str
+    space_id: str
+
+class SpaceThreadCreate(BaseModel):
+    title: str
+
+class SpaceThread(SpaceThreadBase):
+    id: str
+    created_by: str
+    created_at: datetime
+    users: Optional[User] = None
+    message_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+class SpaceMessageBase(BaseModel):
+    content: str
+    thread_id: str
+    attachments: Optional[List[Any]] = None
+    attachment_count: int = 0
+
+class SpaceMessageCreate(BaseModel):
+    content: str
+    attachments: Optional[List[Any]] = None
+    attachment_count: int = 0
+
+class SpaceMessage(SpaceMessageBase):
+    id: str
+    user_id: str
+    created_at: datetime
+    users: Optional[User] = None
+
+    class Config:
+        from_attributes = True

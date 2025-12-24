@@ -24,13 +24,26 @@ async def read_users_me(
     try:
         response = db.from_("users").select("*").eq("id", user_id).execute()
         if not response.data:
-            # print(f"DEBUG: User profile not found in DB for {user_id}")
-            raise HTTPException(status_code=404, detail="User profile not found")
+            # Automatic profile creation if not found
+            email = current_user.get("email")
+            new_user = {
+                "id": user_id,
+                "email": email,
+                "role": "student", # Default role
+                "first_name": "New",
+                "last_name": "User"
+            }
+            # Attempt to create the user profile
+            insert_res = db.from_("users").insert(new_user).execute()
+            if not insert_res.data:
+                raise HTTPException(status_code=500, detail="Could not create user profile")
+            return insert_res.data[0]
+            
         return response.data[0]
     except HTTPException:
         raise
     except Exception as e:
-        # print(f"DEBUG: Error in read_users_me: {str(e)}")
+        print(f"DEBUG: Error in read_users_me: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database error: {str(e)}"
