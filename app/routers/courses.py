@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional, Dict, Any
 from .. import schemas
 from ..auth import get_current_user, require_role
-from ..dependencies import get_supabase
+from ..dependencies import get_supabase, get_supabase_admin
 from supabase import Client
 
 router = APIRouter(
@@ -85,24 +85,41 @@ async def list_courses(
 @router.get("/my/teacher", response_model=List[schemas.Course])
 async def list_teacher_courses(
     current_user: Dict[str, Any] = Depends(require_role("teacher")),
-    db: Client = Depends(get_supabase)
+    db: Client = Depends(get_supabase),
+    db_admin: Client = Depends(get_supabase_admin)
 ):
     user_id = current_user.get("sub")
-    response = db.from_("courses").select("*").eq("teacher_id", user_id).order("created_at", desc=True).execute()
-    courses = response.data or []
     
-    # Teachers often want to see student counts and basic stats. 
-    # For now ensuring schema compliance (we need teacher object even if it's me)
-    
-    # Optimization: Just use the current user info for teacher
-    user_res = db.from_("users").select("id, first_name, last_name, avatar_url").eq("id", user_id).single().execute()
-    teacher_info = user_res.data
-    
-    for c in courses:
-        c["teacher"] = teacher_info
-        # TODO: Add enrollment counts if needed in schema
+    try:
+        response = db.from_("courses").select("*").eq("teacher_id", user_id).order("created_at", desc=True).execute()
+        courses = response.data or []
         
-    return courses
+        # Teachers often want to see student counts and basic stats. 
+        # For now ensuring schema compliance (we need teacher object even if it's me)
+        
+        # Optimization: Just use the current user info for teacher
+        # Use admin client to bypass RLS
+        try:
+            user_res = db_admin.from_("users").select("id, first_name, last_name, avatar_url").eq("id", user_id).single().execute()
+            teacher_info = user_res.data
+        except Exception as e:
+            print(f"Warning: Could not fetch teacher info: {e}")
+            # Provide minimal teacher info if query fails
+            teacher_info = {
+                "id": user_id,
+                "first_name": None,
+                "last_name": None,
+                "avatar_url": None
+            }
+        
+        for c in courses:
+            c["teacher"] = teacher_info
+            # TODO: Add enrollment counts if needed in schema
+            
+        return courses
+    except Exception as e:
+        print(f"Error in list_teacher_courses: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching teacher courses: {str(e)}")
 
 @router.get("/my/student", response_model=List[schemas.Course])
 async def list_student_courses(

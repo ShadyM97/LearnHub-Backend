@@ -110,12 +110,56 @@ async def get_current_user(
     return payload
 
 def require_role(role: str):
-
-
     async def dependency(user=Security(get_current_user)):
-        if user.get("role") != role:
-            raise HTTPException(status_code=403)
-        return user
+        from .dependencies import get_supabase_admin
+        
+        # Get user role from database since JWT doesn't include it
+        # We need admin client to bypass RLS on users table
+        user_id = user.get("sub")
+        print(f"DEBUG: Checking role for user_id: {user_id}")
+        
+        try:
+            db = get_supabase_admin()
+        except HTTPException as e:
+            print(f"DEBUG: Could not get admin client: {e.detail}")
+            raise
+        
+        try:
+            # Use execute() instead of single() to avoid exceptions when user doesn't exist
+            user_res = db.from_("users").select("role").eq("id", user_id).execute()
+            print(f"DEBUG: User query response: {user_res.data}")
+            
+            # Check if user exists in the database
+            if not user_res.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"User profile not found in database. Please complete your profile setup first."
+                )
+            
+            user_role = user_res.data[0].get("role")
+            print(f"DEBUG: User role: {user_role}, Required role: {role}")
+            
+            if user_role != role:
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Access denied. Required role: {role}, your role: {user_role}"
+                )
+            
+            # Add role to user dict for convenience
+            user["role"] = user_role
+            return user
+        except HTTPException:
+            # Re-raise HTTP exceptions (like role mismatch)
+            raise
+        except Exception as e:
+            print(f"DEBUG: Error fetching user role: {str(e)}")
+            print(f"DEBUG: Error type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            # Provide more detailed error message
+            error_detail = f"Could not verify user role. Error: {type(e).__name__}: {str(e)}"
+            raise HTTPException(status_code=403, detail=error_detail)
+    
     return dependency
 
 async def get_current_user_optional(
